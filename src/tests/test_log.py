@@ -6,6 +6,7 @@ def test_get_logger():
     assert logger.name == "nixsearch.test"
 
 
-def test_setup_logging():
-    # Just verify it doesn't raise; it writes to the real log location
+def test_setup_logging(tmp_path, monkeypatch):
+    monkeypatch.setattr("nixsearch.log.config.data_dir", tmp_path)
     setup_logging()
+    assert (tmp_path / "nix-search.log").exists()

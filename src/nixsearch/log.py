@@ -11,6 +11,7 @@ def setup_logging() -> None:
         level=config.log_level,
         format=config.log_format,
         datefmt=config.log_date_format,
+        force=True,
     )
 
 
