@@ -20,7 +20,7 @@ just lint        # ruff check + format check
 - `src/nixsearch/exceptions.py` — exception hierarchy with auto-logging
 - `src/nixsearch/log.py` — file logging to `~/.local/share/nix-search/`
 - `src/nixsearch/check_dependencies.py` — verifies `nix` is in PATH
-- `src/nixsearch/themes/` — TCSS theme files (dracula, gruvbox, nord, tokyonight)
+- `src/nixsearch/themes/` — TCSS theme files (dracula, gruvbox, nord, tokyo-night)
 
 ## Git
 

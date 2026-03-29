@@ -18,7 +18,7 @@ class NixSearchApp(App):
     ENABLE_COMMAND_PALETTE = False
     ansi_color = False
 
-    def __init__(self, theme_name: str = "tokyonight"):
+    def __init__(self, theme_name: str = "tokyo-night"):
         super().__init__()
         self.CSS = load_theme_css(theme_name)
 

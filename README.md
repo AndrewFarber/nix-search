@@ -9,7 +9,7 @@ A terminal UI for searching [Nix](https://nixos.org/) packages, built with [Text
 - Package detail screen with metadata, license, and maintainers
 - View and edit package source files
 - Vim-style keybindings (j/k, Ctrl+d/u, G)
-- Multiple color themes: dracula, gruvbox, nord, tokyonight
+- Multiple color themes: dracula, gruvbox, nord, tokyo-night
 - Configurable via environment variables
 
 ## Installation
@@ -115,10 +115,10 @@ Environment variables (prefix `NIX_SEARCH_`):
 
 | Variable                         | Default    | Description              |
 |----------------------------------|------------|--------------------------|
-| `NIX_SEARCH_THEME`               | tokyonight | Theme: dracula, gruvbox, nord, tokyonight |
+| `NIX_SEARCH_THEME`               | tokyo-night | Theme: dracula, gruvbox, nord, tokyo-night |
 | `NIX_SEARCH_CHANNEL`             | nixpkgs    | Default channel / flake ref |
 | `NIX_SEARCH_MAX_CHANNELS`        | 5          | Max release branches shown |
-| `NIX_SEARCH_EDITOR`              | `$VISUAL` / `$EDITOR` / nano | Editor for source viewing |
+| `NIX_SEARCH_EDITOR`              | nvim       | Editor for source viewing |
 | `NIX_SEARCH_LOG_LEVEL`           | INFO       | Logging level            |
 | `NIX_SEARCH_HALF_PAGE`           | 15         | Half-page scroll size    |
 | `NIX_SEARCH_MAX_DESCRIPTION_LENGTH` | 60      | Truncate descriptions    |
