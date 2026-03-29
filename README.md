@@ -65,7 +65,11 @@ just lint      # ruff check + format
 
 ## Usage
 
-Launch with `nix-search`, type a query, and press Enter to search.
+```bash
+nix run github:AndrewFarber/nix-search
+```
+
+Type a query and press Enter to search. Select a result and press Enter to copy the attribute path to your clipboard.
 
 ### Keybindings
 
