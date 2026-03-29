@@ -35,5 +35,9 @@ def main():
         sys.exit(1)
     log.info("nix-search starting")
     app = NixSearchApp(theme_name=config.theme)
-    app.run()
+    try:
+        app.run()
+    except Exception:
+        log.exception("nix-search crashed")
+        raise
     log.info("nix-search exiting")

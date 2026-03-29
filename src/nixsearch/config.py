@@ -14,7 +14,7 @@ class Config(BaseSettings):
     data_dir: Path = Path.home() / ".local" / "share" / "nix-search"
     half_page: int = 15
     max_description_length: int = 60
-    required_commands: list[str] = ["nix"]
+    required_commands: list[str] = ["nix", "git"]
     channel: str = "nixpkgs"
     max_channels: int = 5
 

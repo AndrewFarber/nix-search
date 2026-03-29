@@ -2,7 +2,7 @@ import asyncio
 import json
 import re
 
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, ValidationError, field_validator, model_validator
 
 from nixsearch.exceptions import NixNotFoundError, NixSearchFailedError
 from nixsearch.log import get_logger
@@ -10,7 +10,7 @@ from nixsearch.log import get_logger
 log = get_logger("service")
 
 NIXPKGS_URL = "https://github.com/NixOS/nixpkgs.git"
-_BRANCH_RE = re.compile(r"^[0-9a-f]+\s+refs/heads/(nixos-\d+\.\d+)$")
+_BRANCH_RE = re.compile(r"^[0-9a-f]+\trefs/heads/(nixos-\d+\.\d+)$")
 
 
 class NixChannel(BaseModel):
@@ -161,7 +161,11 @@ class NixSearchService:
         except json.JSONDecodeError as e:
             msg = f"Failed to parse nix eval output: {e}"
             raise NixSearchFailedError(msg) from e
-        return NixPackageMetadata(**data)
+        try:
+            return NixPackageMetadata(**data)
+        except ValidationError as e:
+            msg = f"Invalid metadata structure for {nixpkgs_attr}: {e}"
+            raise NixSearchFailedError(msg) from e
 
     async def _run_nix(self, *args: str) -> NixResult:
         """Execute a nix subcommand and return the result."""
@@ -193,5 +197,9 @@ class NixSearchService:
         except json.JSONDecodeError as e:
             msg = f"Failed to parse nix search output: {e}"
             raise NixSearchFailedError(msg) from e
-        results = [NixPackage(attr_path=attr_path, **info) for attr_path, info in data.items()]
+        try:
+            results = [NixPackage(attr_path=attr_path, **info) for attr_path, info in data.items()]
+        except ValidationError as e:
+            msg = f"Invalid package data in nix search output: {e}"
+            raise NixSearchFailedError(msg) from e
         return sorted(results, key=lambda p: p.nixpkgs_attr)

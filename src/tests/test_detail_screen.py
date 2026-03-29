@@ -4,6 +4,7 @@ import pytest
 
 from nixsearch.app import NixSearchApp
 from nixsearch.detail_screen import DetailScreen
+from nixsearch.exceptions import NixSearchFailedError
 from nixsearch.service import NixLicense, NixMaintainer, NixPackage, NixPackageMetadata
 
 SAMPLE_META = NixPackageMetadata(
@@ -68,7 +69,7 @@ async def test_detail_screen_handles_error():
     async with app.run_test() as pilot:
         screen = DetailScreen(SAMPLE_PKG)
         screen._service = AsyncMock()
-        screen._service.get_meta = AsyncMock(side_effect=RuntimeError("nix failed"))
+        screen._service.get_meta = AsyncMock(side_effect=NixSearchFailedError("nix failed"))
         app.push_screen(screen)
         await pilot.pause()
         text = str(screen.query_one("#detail-content").render())
@@ -112,7 +113,7 @@ async def test_detail_screen_copy_attr_clipboard_failure():
         screen._service.get_meta = AsyncMock(return_value=SAMPLE_META)
         app.push_screen(screen)
         await pilot.pause()
-        with patch.object(app, "copy_to_clipboard", side_effect=Exception("no clipboard")):
+        with patch.object(app, "copy_to_clipboard", side_effect=OSError("no clipboard")):
             screen.action_copy_attr()
 
 

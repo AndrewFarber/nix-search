@@ -4,6 +4,7 @@ from textual.containers import VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Footer, Header, Static
 
+from nixsearch.exceptions import NixNotFoundError, NixSearchFailedError
 from nixsearch.log import get_logger
 from nixsearch.service import NixPackage, NixPackageMetadata, NixSearchService
 
@@ -39,7 +40,7 @@ class DetailScreen(Screen):
             self._service = NixSearchService()
         try:
             meta = await self._service.get_meta(self._package.nixpkgs_attr, channel=self._channel)
-        except Exception as e:
+        except (NixNotFoundError, NixSearchFailedError) as e:
             log.error("Failed to fetch metadata for %r: %s", self._package.nixpkgs_attr, e)
             content.update(f"Failed to load metadata: {e}")
             return
@@ -90,7 +91,7 @@ class DetailScreen(Screen):
         try:
             self.app.copy_to_clipboard(self._package.nixpkgs_attr)
             self.notify(f"Copied: {self._package.nixpkgs_attr}")
-        except Exception:
+        except (OSError, RuntimeError):
             log.warning("Clipboard unavailable")
             self.notify(
                 f"Clipboard unavailable — package: {self._package.nixpkgs_attr}",

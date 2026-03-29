@@ -6,6 +6,7 @@ from textual.widgets import DataTable, Footer, Header, Input, Select
 
 from nixsearch.config import config
 from nixsearch.detail_screen import DetailScreen
+from nixsearch.exceptions import NixNotFoundError, NixSearchFailedError
 from nixsearch.log import get_logger
 from nixsearch.service import NixPackage, NixSearchService
 
@@ -68,7 +69,7 @@ class SearchScreen(Screen):
     async def _load_channels(self) -> None:
         try:
             channels_list = await self._service.list_channels()
-        except Exception as e:
+        except (OSError, NixSearchFailedError) as e:
             log.warning("Failed to load channels: %s", e)
             return
         default = config.channel
@@ -94,10 +95,10 @@ class SearchScreen(Screen):
             label = f"{config.channel} (unstable)"
         else:
             label = channel.split("/")[-1]
-        self.notify(f"Searching {label}", timeout=120)
+        self.notify(f"Searching {label}", timeout=5)
         try:
             results = await self._service.search(query, channel=channel)
-        except Exception as e:
+        except (NixNotFoundError, NixSearchFailedError) as e:
             log.error("Search failed for %r: %s", query, e)
             self.notify(f"Search failed: {e}", severity="error")
             return
@@ -165,7 +166,7 @@ class SearchScreen(Screen):
             try:
                 self.app.copy_to_clipboard(pkg.nixpkgs_attr)
                 self.notify(f"Copied: {pkg.nixpkgs_attr}")
-            except Exception:
+            except (OSError, RuntimeError):
                 log.warning("Clipboard unavailable")
                 self.notify(
                     f"Clipboard unavailable — package: {pkg.nixpkgs_attr}",

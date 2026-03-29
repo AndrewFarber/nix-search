@@ -272,7 +272,7 @@ async def test_clipboard_failure_shows_warning():
         input_widget.focus()
         await pilot.press("enter")
         await pilot.pause()
-        with patch.object(pilot.app, "copy_to_clipboard", side_effect=Exception("no clipboard")):
+        with patch.object(pilot.app, "copy_to_clipboard", side_effect=OSError("no clipboard")):
             screen.action_copy_attr()
             # Should not raise — the warning notification is shown instead
 
