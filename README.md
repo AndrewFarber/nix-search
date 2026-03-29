@@ -21,6 +21,37 @@ nix run github:AndrewFarber/nix-search
 nix profile install github:AndrewFarber/nix-search
 ```
 
+### NixOS / Home Manager
+
+Add the flake input, then reference the package:
+
+```nix
+# flake.nix
+{
+  inputs.nix-search.url = "github:AndrewFarber/nix-search";
+
+  outputs = { nixpkgs, nix-search, ... }: {
+    # ...
+  };
+}
+```
+
+**NixOS (`configuration.nix`):**
+
+```nix
+environment.systemPackages = [
+  inputs.nix-search.packages.${pkgs.system}.default
+];
+```
+
+**Home Manager:**
+
+```nix
+home.packages = [
+  inputs.nix-search.packages.${pkgs.system}.default
+];
+```
+
 ### Development
 
 ```bash
