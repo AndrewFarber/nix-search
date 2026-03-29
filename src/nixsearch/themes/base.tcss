@@ -1,0 +1,10 @@
+#search-input {
+    dock: top;
+    width: 1fr;
+    margin: 0;
+}
+
+#search-results {
+    height: 1fr;
+    scrollbar-gutter: stable;
+}

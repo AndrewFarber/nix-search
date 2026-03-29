@@ -1,0 +1,23 @@
+Screen {
+    background: #2e3440;
+}
+
+DataTable > .datatable--cursor {
+    background: #88c0d0;
+    color: #2e3440;
+}
+
+Header {
+    background: #3b4252;
+    color: #eceff4;
+}
+
+#search-input {
+    border: tall #4c566a;
+    background: #3b4252;
+    color: #eceff4;
+}
+
+#search-input:focus {
+    border: tall #88c0d0;
+}
