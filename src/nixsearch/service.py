@@ -1,6 +1,9 @@
 import asyncio
 import json
 import re
+import shutil
+import tempfile
+from pathlib import Path
 
 from pydantic import BaseModel, ValidationError, field_validator, model_validator
 
@@ -166,6 +169,23 @@ class NixSearchService:
         except ValidationError as e:
             msg = f"Invalid metadata structure for {nixpkgs_attr}: {e}"
             raise NixSearchFailedError(msg) from e
+
+    @staticmethod
+    def copy_nix_source(position: str) -> tuple[Path, str]:
+        """Copy .nix files from the nix store source dir to a temp directory.
+
+        Returns (temp_dir, main_filename).
+        """
+        # position looks like "/nix/store/...-source/pkgs/hello/default.nix:1"
+        file_path = Path(position.rsplit(":", 1)[0])
+        source_dir = file_path.parent
+        if not source_dir.is_dir():
+            msg = f"Source directory not found: {source_dir}"
+            raise FileNotFoundError(msg)
+        tmp_dir = Path(tempfile.mkdtemp(prefix="nix-search-"))
+        for nix_file in source_dir.glob("*.nix"):
+            shutil.copy2(nix_file, tmp_dir / nix_file.name)
+        return tmp_dir, file_path.name
 
     async def _run_nix(self, *args: str) -> NixResult:
         """Execute a nix subcommand and return the result."""

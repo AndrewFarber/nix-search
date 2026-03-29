@@ -270,3 +270,43 @@ async def test_search_with_custom_channel():
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
+
+
+@pytest.mark.asyncio
+async def test_list_channels_git_not_found():
+    svc = NixSearchService()
+    with patch("asyncio.create_subprocess_exec", side_effect=FileNotFoundError):
+        channels = await svc.list_channels()
+    assert channels == []
+
+
+@pytest.mark.asyncio
+async def test_get_meta_invalid_metadata():
+    # Return JSON that will fail NixPackageMetadata validation
+    # license must be a dict/list, maintainers must be list of dicts
+    fake_output = json.dumps({"license": [{"fullName": 123}]})
+    mock_proc = AsyncMock()
+    mock_proc.communicate.return_value = (fake_output.encode(), b"")
+    mock_proc.returncode = 0
+
+    svc = NixSearchService()
+    with patch("nixsearch.service.asyncio.create_subprocess_exec", return_value=mock_proc):
+        with pytest.raises(NixSearchFailedError, match="Invalid metadata"):
+            await svc.get_meta("hello")
+
+
+@pytest.mark.asyncio
+async def test_search_invalid_package_data():
+    # Return JSON where package data will fail NixPackage validation
+    # version field expects str|None, passing a list triggers ValidationError
+    fake_output = json.dumps(
+        {"legacyPackages.x86_64-linux.hello": {"version": ["not", "a", "string"]}}
+    )
+    mock_proc = AsyncMock()
+    mock_proc.communicate.return_value = (fake_output.encode(), b"")
+    mock_proc.returncode = 0
+
+    svc = NixSearchService()
+    with patch("nixsearch.service.asyncio.create_subprocess_exec", return_value=mock_proc):
+        with pytest.raises(NixSearchFailedError, match="Invalid package data"):
+            await svc.search("hello")

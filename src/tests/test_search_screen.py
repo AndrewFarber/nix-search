@@ -1,9 +1,10 @@
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from textual.widgets import Select
 
 from nixsearch.app import NixSearchApp
+from nixsearch.exceptions import NixSearchFailedError
 from nixsearch.search_screen import SearchScreen
 from nixsearch.service import NixChannel, NixPackage
 
@@ -313,3 +314,105 @@ async def test_focus_channel():
         await pilot.pause()
         select = screen.query_one("#channel-select", Select)
         assert select.has_focus
+
+
+@pytest.mark.asyncio
+async def test_selected_channel_none_returns_default():
+    async with NixSearchApp().run_test() as pilot:
+        screen = _get_screen(pilot)
+        # Simulate the channel select having a None value
+        screen._channel_select = MagicMock()
+        screen._channel_select.value = None
+        assert screen._selected_channel == "nixpkgs"
+
+
+@pytest.mark.asyncio
+async def test_load_channels_error_is_handled():
+    async with NixSearchApp().run_test() as pilot:
+        screen = _get_screen(pilot)
+        screen._service = AsyncMock()
+        screen._service.list_channels = AsyncMock(side_effect=NixSearchFailedError("git failed"))
+        await screen._load_channels()
+        await pilot.pause()
+        # Should not crash; channel select keeps its default value
+        select = screen.query_one("#channel-select", Select)
+        assert select.value == "nixpkgs"
+
+
+@pytest.mark.asyncio
+async def test_search_with_non_default_channel():
+    packages = [
+        NixPackage(name="hello", nixpkgs_attr="hello", version="2.12", description="A greeting"),
+    ]
+    async with NixSearchApp().run_test() as pilot:
+        screen = _get_screen(pilot)
+        screen._service = AsyncMock()
+        screen._service.search = AsyncMock(return_value=packages)
+        input_widget = screen.query_one("#search-input")
+        input_widget.value = "hello"
+        input_widget.focus()
+        # Set a non-default channel
+        select = screen.query_one("#channel-select", Select)
+        select.set_options([("nixpkgs/nixos-24.11", "nixpkgs/nixos-24.11")])
+        select.value = "nixpkgs/nixos-24.11"
+        await pilot.press("enter")
+        await pilot.pause()
+        table = screen.query_one("#search-results")
+        assert table.row_count == 1
+
+
+@pytest.mark.asyncio
+async def test_search_nix_error_notifies():
+    async with NixSearchApp().run_test() as pilot:
+        screen = _get_screen(pilot)
+        screen._service = AsyncMock()
+        screen._service.search = AsyncMock(side_effect=NixSearchFailedError("nix search failed"))
+        input_widget = screen.query_one("#search-input")
+        input_widget.value = "hello"
+        input_widget.focus()
+        await pilot.press("enter")
+        await pilot.pause()
+        table = screen.query_one("#search-results")
+        assert table.row_count == 0
+
+
+@pytest.mark.asyncio
+async def test_copy_attr_input_focused_does_nothing():
+    packages = [
+        NixPackage(name="hello", nixpkgs_attr="hello", version="2.12", description="A greeting"),
+    ]
+    async with NixSearchApp().run_test() as pilot:
+        screen = _get_screen(pilot)
+        screen._service = AsyncMock()
+        screen._service.search = AsyncMock(return_value=packages)
+        input_widget = screen.query_one("#search-input")
+        input_widget.value = "hello"
+        input_widget.focus()
+        await pilot.press("enter")
+        await pilot.pause()
+        # Re-focus input, then try copy
+        input_widget.focus()
+        await pilot.pause()
+        mock_copy = MagicMock()
+        with patch.object(pilot.app, "copy_to_clipboard", mock_copy):
+            screen.action_copy_attr()
+        mock_copy.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_quit_with_table_focused_exits():
+    packages = [
+        NixPackage(name="hello", nixpkgs_attr="hello", version="2.12", description="A greeting"),
+    ]
+    async with NixSearchApp().run_test() as pilot:
+        screen = _get_screen(pilot)
+        screen._service = AsyncMock()
+        screen._service.search = AsyncMock(return_value=packages)
+        input_widget = screen.query_one("#search-input")
+        input_widget.value = "hello"
+        input_widget.focus()
+        await pilot.press("enter")
+        await pilot.pause()
+        table = screen.query_one("#search-results")
+        assert table.has_focus
+        screen.action_quit()

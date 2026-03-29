@@ -57,3 +57,18 @@ def test_main_missing_dependency():
     ):
         with pytest.raises(SystemExit, match="1"):
             main()
+
+
+def test_main_app_crash_is_reraised():
+    mock_config = Config(theme="dracula")
+    with (
+        patch("nixsearch.app.setup_logging"),
+        patch("nixsearch.app.check_dependencies"),
+        patch("nixsearch.app.config", mock_config),
+        patch("nixsearch.app.NixSearchApp") as mock_app_cls,
+    ):
+        mock_app = MagicMock()
+        mock_app.run.side_effect = RuntimeError("crash")
+        mock_app_cls.return_value = mock_app
+        with pytest.raises(RuntimeError, match="crash"):
+            main()

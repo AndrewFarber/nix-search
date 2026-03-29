@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from pydantic import field_validator
@@ -7,7 +8,8 @@ from pydantic_settings import BaseSettings
 class Config(BaseSettings):
     model_config = {"env_prefix": "NIX_SEARCH_"}
 
-    theme: str = "dracula"
+    theme: str = "tokyonight"
+    editor: str = os.environ.get("VISUAL") or os.environ.get("EDITOR") or "nano"
     log_level: str = "INFO"
     log_format: str = "%(asctime)s %(levelname)s %(name)s: %(message)s"
     log_date_format: str = "%Y-%m-%d %H:%M:%S"

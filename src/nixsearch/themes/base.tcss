@@ -1,11 +1,17 @@
 #search-bar {
     dock: top;
-    height: auto;
+    height: 3;
     width: 1fr;
 }
 
 #channel-select {
     width: 40;
+}
+
+#channel-select > SelectCurrent {
+    border: none;
+    height: 3;
+    padding: 1 2;
 }
 
 #search-input {

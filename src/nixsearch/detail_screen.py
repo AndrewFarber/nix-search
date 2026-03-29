@@ -1,9 +1,12 @@
+import subprocess
+
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Footer, Header, Static
 
+from nixsearch.config import config
 from nixsearch.exceptions import NixNotFoundError, NixSearchFailedError
 from nixsearch.log import get_logger
 from nixsearch.service import NixPackage, NixPackageMetadata, NixSearchService
@@ -16,6 +19,7 @@ class DetailScreen(Screen):
         Binding("escape", "go_back", "Back"),
         Binding("q", "go_back", "Back"),
         Binding("y", "copy_attr", "Copy attr"),
+        Binding("e", "edit_source", "Edit source"),
     ]
 
     def __init__(self, package: NixPackage, channel: str = "nixpkgs") -> None:
@@ -23,6 +27,7 @@ class DetailScreen(Screen):
         self._package = package
         self._channel = channel
         self._service: NixSearchService | None = None
+        self._meta: NixPackageMetadata | None = None
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -44,6 +49,7 @@ class DetailScreen(Screen):
             log.error("Failed to fetch metadata for %r: %s", self._package.nixpkgs_attr, e)
             content.update(f"Failed to load metadata: {e}")
             return
+        self._meta = meta
         content.update(self._format_meta(meta))
 
     def _format_meta(self, meta: NixPackageMetadata) -> str:
@@ -97,3 +103,18 @@ class DetailScreen(Screen):
                 f"Clipboard unavailable — package: {self._package.nixpkgs_attr}",
                 severity="warning",
             )
+
+    def action_edit_source(self) -> None:
+        if self._meta is None or not self._meta.position:
+            self.notify("No source position available", severity="warning")
+            return
+        try:
+            tmp_dir, main_file = NixSearchService.copy_nix_source(self._meta.position)
+        except FileNotFoundError as e:
+            log.warning("Source not found: %s", e)
+            self.notify(f"Source not found: {e}", severity="error")
+            return
+        file_path = str(tmp_dir / main_file)
+        with self.app.suspend():
+            subprocess.run([config.editor, file_path], check=False)  # noqa: S603
+        self.notify(f"Source files in {tmp_dir}")

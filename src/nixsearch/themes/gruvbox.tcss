@@ -1,13 +1,31 @@
 Screen {
     background: #282828;
-}
-
-DataTable > .datatable--cursor {
-    background: #d79921;
-    color: #282828;
+    color: #ebdbb2;
 }
 
 Header {
+    background: #3c3836;
+    color: #d79921;
+    dock: top;
+    height: 1;
+}
+
+HeaderTitle {
+    color: #d79921;
+    background: #3c3836;
+}
+
+Footer {
+    background: #3c3836;
+    color: #ebdbb2;
+}
+
+FooterKey > .footer-key--key {
+    background: #504945;
+    color: #d79921;
+}
+
+FooterKey > .footer-key--description {
     background: #3c3836;
     color: #ebdbb2;
 }
@@ -20,4 +38,34 @@ Header {
 
 #search-input:focus {
     border: tall #d79921;
+}
+
+#channel-select {
+    background: #3c3836;
+    color: #ebdbb2;
+}
+
+#channel-select > SelectCurrent {
+    background: #3c3836;
+    color: #ebdbb2;
+}
+
+DataTable {
+    background: #282828;
+    color: #ebdbb2;
+}
+
+DataTable > .datatable--header {
+    background: #3c3836;
+    color: #d79921;
+}
+
+DataTable > .datatable--cursor {
+    background: #d79921;
+    color: #282828;
+}
+
+#detail-content {
+    background: #282828;
+    color: #ebdbb2;
 }

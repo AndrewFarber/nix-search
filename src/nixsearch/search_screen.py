@@ -59,6 +59,9 @@ class SearchScreen(Screen):
     def _input_has_focus(self) -> bool:
         return self._input.has_focus
 
+    def _channel_has_focus(self) -> bool:
+        return self._channel_select.has_focus
+
     @property
     def _selected_channel(self) -> str:
         value = self._channel_select.value
@@ -116,13 +119,36 @@ class SearchScreen(Screen):
             self._table.add_row(pkg.nixpkgs_attr, pkg.version or "unknown", desc)
         self._table.focus()
 
+    def _cycle_channel(self, delta: int) -> None:
+        options = self._channel_select._options
+        if not options:
+            return
+        values = [v for _, v in options]
+        current = self._channel_select.value
+        try:
+            idx = values.index(current)
+        except ValueError:
+            idx = 0
+        idx = (idx + delta) % len(values)
+        self._channel_select.value = values[idx]
+
     def action_cursor_down(self) -> None:
-        if self._input_has_focus() or self._table.row_count == 0:
+        if self._input_has_focus():
+            return
+        if self._channel_has_focus():
+            self._cycle_channel(1)
+            return
+        if self._table.row_count == 0:
             return
         self._table.action_cursor_down()
 
     def action_cursor_up(self) -> None:
-        if self._input_has_focus() or self._table.row_count == 0:
+        if self._input_has_focus():
+            return
+        if self._channel_has_focus():
+            self._cycle_channel(-1)
+            return
+        if self._table.row_count == 0:
             return
         self._table.action_cursor_up()
 
@@ -151,6 +177,8 @@ class SearchScreen(Screen):
     def action_submit_or_select(self) -> None:
         if self._input_has_focus():
             self._do_search()
+        elif self._channel_has_focus():
+            self._table.focus()
         elif self._table.row_count > 0:
             row_idx = self._table.cursor_row
             if 0 <= row_idx < len(self._results):
@@ -182,7 +210,7 @@ class SearchScreen(Screen):
             self._input.focus()
 
     def action_focus_table(self) -> None:
-        if self._input_has_focus() and self._table.row_count > 0:
+        if (self._input_has_focus() or self._channel_has_focus()) and self._table.row_count > 0:
             self._table.focus()
 
     def action_quit(self) -> None:

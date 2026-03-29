@@ -5,6 +5,9 @@ A terminal UI for searching [Nix](https://nixos.org/) packages, built with [Text
 ## Features
 
 - Fast, interactive search of nixpkgs
+- Channel selector with NixOS release branches
+- Package detail screen with metadata, license, and maintainers
+- View and edit package source files
 - Vim-style keybindings (j/k, Ctrl+d/u, G)
 - Multiple color themes: dracula, gruvbox, nord, tokyonight
 - Configurable via environment variables
@@ -69,32 +72,56 @@ just lint      # ruff check + format
 nix run github:AndrewFarber/nix-search
 ```
 
-Type a query and press Enter to search. Select a result and press Enter to copy the attribute path to your clipboard.
+Type a query and press Enter to search. Select a result and press Enter to view package details.
 
 ### Keybindings
+
+**Search screen:**
 
 | Key        | Action                              |
 |------------|-------------------------------------|
 | `/`        | New search                          |
-| `Enter`    | Search (input) / Copy install (table) |
+| `Enter`    | Search (input) / Open detail (table)|
 | `Escape`   | Return to table                     |
 | `j` / `k`  | Cursor down / up                    |
 | `Ctrl+d`   | Page down                           |
 | `Ctrl+u`   | Page up                             |
 | `Home`     | First row                           |
 | `End` / `G`| Last row                            |
+| `y`        | Copy attribute path to clipboard    |
+| `c`        | Focus channel selector              |
 | `q`        | Quit                                |
+
+**Channel selector** (after pressing `c`):
+
+| Key        | Action                              |
+|------------|-------------------------------------|
+| `j` / `k`  | Next / previous channel            |
+| `Enter`    | Confirm and return to table         |
+| `Escape`   | Return to table                     |
+
+**Detail screen:**
+
+| Key        | Action                              |
+|------------|-------------------------------------|
+| `Escape`   | Back to search                      |
+| `q`        | Back to search                      |
+| `y`        | Copy attribute path to clipboard    |
+| `e`        | Edit package source                 |
 
 ### Configuration
 
 Environment variables (prefix `NIX_SEARCH_`):
 
-| Variable                         | Default | Description              |
-|----------------------------------|---------|--------------------------|
-| `NIX_SEARCH_THEME`               | —       | Theme: dracula, gruvbox, nord, tokyonight |
-| `NIX_SEARCH_LOG_LEVEL`           | INFO    | Logging level            |
-| `NIX_SEARCH_HALF_PAGE`           | 15      | Half-page scroll size    |
-| `NIX_SEARCH_MAX_DESCRIPTION_LENGTH` | 60   | Truncate descriptions    |
+| Variable                         | Default    | Description              |
+|----------------------------------|------------|--------------------------|
+| `NIX_SEARCH_THEME`               | tokyonight | Theme: dracula, gruvbox, nord, tokyonight |
+| `NIX_SEARCH_CHANNEL`             | nixpkgs    | Default channel / flake ref |
+| `NIX_SEARCH_MAX_CHANNELS`        | 5          | Max release branches shown |
+| `NIX_SEARCH_EDITOR`              | `$VISUAL` / `$EDITOR` / nano | Editor for source viewing |
+| `NIX_SEARCH_LOG_LEVEL`           | INFO       | Logging level            |
+| `NIX_SEARCH_HALF_PAGE`           | 15         | Half-page scroll size    |
+| `NIX_SEARCH_MAX_DESCRIPTION_LENGTH` | 60      | Truncate descriptions    |
 
 ## License
 
