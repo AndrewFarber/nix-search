@@ -15,6 +15,8 @@ class Config(BaseSettings):
     half_page: int = 15
     max_description_length: int = 60
     required_commands: list[str] = ["nix"]
+    channel: str = "nixpkgs"
+    max_channels: int = 5
 
     @field_validator("half_page", "max_description_length")
     @classmethod

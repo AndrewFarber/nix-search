@@ -1,10 +1,11 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from textual.widgets import Select
 
 from nixsearch.app import NixSearchApp
 from nixsearch.search_screen import SearchScreen
-from nixsearch.service import NixPackage
+from nixsearch.service import NixChannel, NixPackage
 
 
 def _get_screen(pilot) -> SearchScreen:
@@ -219,7 +220,7 @@ async def test_escape_with_empty_table_stays_on_input():
 
 
 @pytest.mark.asyncio
-async def test_select_copies_install_command():
+async def test_select_pushes_detail_screen():
     packages = [
         NixPackage(name="hello", nixpkgs_attr="hello", version="2.12", description="A greeting"),
     ]
@@ -232,8 +233,29 @@ async def test_select_copies_install_command():
         input_widget.focus()
         await pilot.press("enter")
         await pilot.pause()
-        # Select the first row - should not raise
         screen.action_submit_or_select()
+        await pilot.pause()
+        from nixsearch.detail_screen import DetailScreen
+
+        assert isinstance(pilot.app.screen, DetailScreen)
+
+
+@pytest.mark.asyncio
+async def test_copy_attr_with_y():
+    packages = [
+        NixPackage(name="hello", nixpkgs_attr="hello", version="2.12", description="A greeting"),
+    ]
+    async with NixSearchApp().run_test() as pilot:
+        screen = _get_screen(pilot)
+        screen._service = AsyncMock()
+        screen._service.search = AsyncMock(return_value=packages)
+        input_widget = screen.query_one("#search-input")
+        input_widget.value = "hello"
+        input_widget.focus()
+        await pilot.press("enter")
+        await pilot.pause()
+        # Should not raise
+        screen.action_copy_attr()
 
 
 @pytest.mark.asyncio
@@ -251,5 +273,43 @@ async def test_clipboard_failure_shows_warning():
         await pilot.press("enter")
         await pilot.pause()
         with patch.object(pilot.app, "copy_to_clipboard", side_effect=Exception("no clipboard")):
-            screen.action_submit_or_select()
+            screen.action_copy_attr()
             # Should not raise — the warning notification is shown instead
+
+
+@pytest.mark.asyncio
+async def test_channel_select_exists():
+    async with NixSearchApp().run_test() as pilot:
+        screen = _get_screen(pilot)
+        select = screen.query_one("#channel-select", Select)
+        assert select is not None
+        assert select.value == "nixpkgs"
+
+
+@pytest.mark.asyncio
+async def test_channel_select_loads_channels():
+    channels = [
+        NixChannel(branch="nixos-24.11"),
+        NixChannel(branch="nixos-24.05"),
+    ]
+    async with NixSearchApp().run_test() as pilot:
+        screen = _get_screen(pilot)
+        screen._service = AsyncMock()
+        screen._service.list_channels = AsyncMock(return_value=channels)
+        await screen._load_channels()
+        await pilot.pause()
+        select = screen.query_one("#channel-select", Select)
+        assert select.value == "nixpkgs"
+
+
+@pytest.mark.asyncio
+async def test_focus_channel():
+    async with NixSearchApp().run_test() as pilot:
+        screen = _get_screen(pilot)
+        table = screen.query_one("#search-results")
+        table.focus()
+        await pilot.pause()
+        screen.action_focus_channel()
+        await pilot.pause()
+        select = screen.query_one("#channel-select", Select)
+        assert select.has_focus

@@ -1,5 +1,14 @@
-#search-input {
+#search-bar {
     dock: top;
+    height: auto;
+    width: 1fr;
+}
+
+#channel-select {
+    width: 40;
+}
+
+#search-input {
     width: 1fr;
     margin: 0;
 }
@@ -7,4 +16,8 @@
 #search-results {
     height: 1fr;
     scrollbar-gutter: stable;
+}
+
+#detail-content {
+    padding: 1 2;
 }

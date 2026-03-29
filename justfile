@@ -2,7 +2,7 @@ default:
     @just --list
 
 test:
-    pytest src/tests -v -s --cov=nixsearch --cov-report=term-missing
+    pytest src/tests -q --tb=short --no-header --cov=nixsearch --cov-report=term-missing
 
 run:
     PYTHONPATH=src python -c "from nixsearch.app import main; main()"

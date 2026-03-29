@@ -5,6 +5,8 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nix-search"
 version = "0.0.1"
+description = "Terminal UI for searching Nix packages"
+authors = [{name = "Andrew Farber"}]
 requires-python = ">=3.12"
 dependencies = ["pydantic", "pydantic-settings", "textual"]
 

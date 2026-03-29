@@ -1,10 +1,17 @@
+import asyncio
 import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from nixsearch.exceptions import NixNotFoundError, NixSearchFailedError
-from nixsearch.service import NixPackage, NixResult, NixSearchService
+from nixsearch.service import (
+    NixChannel,
+    NixPackage,
+    NixPackageMetadata,
+    NixResult,
+    NixSearchService,
+)
 
 
 def test_nix_result_ok():
@@ -126,3 +133,140 @@ async def test_search_nonzero_exit():
     with patch("nixsearch.service.asyncio.create_subprocess_exec", return_value=mock_proc):
         with pytest.raises(NixSearchFailedError, match="exit 1"):
             await svc.search("hello")
+
+
+@pytest.mark.asyncio
+async def test_get_meta_parses_json():
+    fake_output = json.dumps(
+        {
+            "description": "A greeting program",
+            "homepage": "https://example.com",
+            "license": {"fullName": "MIT", "spdxId": "MIT", "url": "https://mit.edu", "free": True},
+            "maintainers": [{"name": "Alice", "email": "a@b.com", "github": "alice"}],
+            "mainProgram": "hello",
+            "platforms": ["x86_64-linux"],
+            "position": "/nix/store/src/hello.nix:1",
+            "broken": False,
+            "unfree": False,
+            "insecure": False,
+            "available": True,
+        }
+    )
+    mock_proc = AsyncMock()
+    mock_proc.communicate.return_value = (fake_output.encode(), b"")
+    mock_proc.returncode = 0
+
+    svc = NixSearchService()
+    with patch("nixsearch.service.asyncio.create_subprocess_exec", return_value=mock_proc):
+        meta = await svc.get_meta("hello")
+
+    assert isinstance(meta, NixPackageMetadata)
+    assert meta.description == "A greeting program"
+    assert meta.homepage == "https://example.com"
+    assert len(meta.license) == 1
+    assert meta.license[0].full_name == "MIT"
+    assert meta.main_program == "hello"
+
+
+@pytest.mark.asyncio
+async def test_get_meta_empty_output():
+    mock_proc = AsyncMock()
+    mock_proc.communicate.return_value = (b"", b"")
+    mock_proc.returncode = 0
+
+    svc = NixSearchService()
+    with patch("nixsearch.service.asyncio.create_subprocess_exec", return_value=mock_proc):
+        with pytest.raises(NixSearchFailedError, match="no output"):
+            await svc.get_meta("hello")
+
+
+@pytest.mark.asyncio
+async def test_get_meta_malformed_json():
+    mock_proc = AsyncMock()
+    mock_proc.communicate.return_value = (b"not json", b"")
+    mock_proc.returncode = 0
+
+    svc = NixSearchService()
+    with patch("nixsearch.service.asyncio.create_subprocess_exec", return_value=mock_proc):
+        with pytest.raises(NixSearchFailedError, match="Failed to parse"):
+            await svc.get_meta("hello")
+
+
+def test_channel_model():
+    ch = NixChannel(branch="nixos-24.11")
+    assert ch.branch == "nixos-24.11"
+    assert ch.flake_ref == "nixpkgs/nixos-24.11"
+
+
+def test_channel_empty_branch_rejected():
+    with pytest.raises(ValueError, match="branch must not be empty"):
+        NixChannel(branch="  ")
+
+
+@pytest.mark.asyncio
+async def test_list_channels_parses_output():
+    fake_output = (
+        "abc123\trefs/heads/nixos-24.11\n"
+        "def456\trefs/heads/nixos-24.11-small\n"
+        "aabbcc\trefs/heads/nixos-24.05\n"
+        "ddeeff\trefs/heads/nixos-unstable\n"
+    )
+    mock_proc = AsyncMock()
+    mock_proc.communicate.return_value = (fake_output.encode(), b"")
+    mock_proc.returncode = 0
+
+    svc = NixSearchService()
+    with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+        channels = await svc.list_channels()
+
+    # Only matches nixos-XX.YY pattern (not -small, not unstable)
+    assert len(channels) == 2
+    assert channels[0].branch == "nixos-24.11"
+    assert channels[1].branch == "nixos-24.05"
+
+
+@pytest.mark.asyncio
+async def test_list_channels_empty_output():
+    mock_proc = AsyncMock()
+    mock_proc.communicate.return_value = (b"", b"")
+    mock_proc.returncode = 0
+
+    svc = NixSearchService()
+    with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+        channels = await svc.list_channels()
+
+    assert channels == []
+
+
+@pytest.mark.asyncio
+async def test_search_with_custom_channel():
+    fake_output = json.dumps(
+        {
+            "legacyPackages.x86_64-linux.hello": {
+                "version": "2.12",
+                "description": "A greeting",
+            },
+        }
+    )
+    mock_proc = AsyncMock()
+    mock_proc.communicate.return_value = (fake_output.encode(), b"")
+    mock_proc.returncode = 0
+
+    svc = NixSearchService()
+    channel = "nixpkgs/nixos-24.11"
+    with patch(
+        "nixsearch.service.asyncio.create_subprocess_exec",
+        return_value=mock_proc,
+    ) as mock_exec:
+        results = await svc.search("hello", channel=channel)
+
+    assert len(results) == 1
+    mock_exec.assert_called_once_with(
+        "nix",
+        "search",
+        channel,
+        "hello",
+        "--json",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
