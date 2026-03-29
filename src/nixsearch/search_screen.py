@@ -37,7 +37,7 @@ class SearchScreen(Screen):
         self._table = self.query_one("#search-results", DataTable)
         self._input = self.query_one("#search-input", Input)
         self._table.cursor_type = "row"
-        self._table.add_column("Name", width=30)
+        self._table.add_column("Package", width=40)
         self._table.add_column("Version", width=15)
         self._table.add_column("Description")
         self._input.focus()
@@ -68,7 +68,7 @@ class SearchScreen(Screen):
             desc = pkg.description
             if len(desc) > config.max_description_length:
                 desc = desc[: config.max_description_length] + "..."
-            self._table.add_row(pkg.name, pkg.version, desc)
+            self._table.add_row(pkg.nixpkgs_attr, pkg.version, desc)
         self._table.focus()
 
     def action_cursor_down(self) -> None:
@@ -111,11 +111,14 @@ class SearchScreen(Screen):
             if 0 <= row_idx < len(self._results):
                 pkg = self._results[row_idx]
                 try:
-                    self.app.copy_to_clipboard(pkg.name)
-                    self.notify(f"Copied: {pkg.name}")
+                    self.app.copy_to_clipboard(pkg.nixpkgs_attr)
+                    self.notify(f"Copied: {pkg.nixpkgs_attr}")
                 except Exception:
                     log.warning("Clipboard unavailable")
-                    self.notify(f"Clipboard unavailable — package: {pkg.name}", severity="warning")
+                    self.notify(
+                        f"Clipboard unavailable — package: {pkg.nixpkgs_attr}",
+                        severity="warning",
+                    )
 
     def action_focus_input(self) -> None:
         if not self._input_has_focus():

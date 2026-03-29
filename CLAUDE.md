@@ -22,6 +22,10 @@ just lint        # ruff check + format check
 - `src/nixsearch/check_dependencies.py` — verifies `nix` is in PATH
 - `src/nixsearch/themes/` — TCSS theme files (dracula, gruvbox, nord, tokyonight)
 
+## Git
+
+- Never include "Co-Authored-By" or any AI/assistant mention in commit messages.
+
 ## Testing
 
 Tests live in `src/tests/`. All UI tests use Textual's `run_test()` pilot. Service tests mock `asyncio.create_subprocess_exec`. Target: 99%+ coverage.

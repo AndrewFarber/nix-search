@@ -90,4 +90,4 @@ class NixSearchService:
             msg = f"Failed to parse nix search output: {e}"
             raise NixSearchFailedError(msg) from e
         results = [NixPackage(attr_path=attr_path, **info) for attr_path, info in data.items()]
-        return sorted(results, key=lambda p: p.name)
+        return sorted(results, key=lambda p: p.nixpkgs_attr)
