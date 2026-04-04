@@ -1,6 +1,6 @@
 # nix-search
 
-TUI for searching Nix packages, built with Textual + Pydantic.
+TUI for searching Nix packages.
 
 ## Development
 

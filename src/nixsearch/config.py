@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
@@ -10,22 +10,20 @@ class Config(BaseSettings):
     theme: str = "tokyo-night"
     editor: str = "nvim"
     log_level: str = "INFO"
-    log_format: str = "%(asctime)s %(levelname)s %(name)s: %(message)s"
-    log_date_format: str = "%Y-%m-%d %H:%M:%S"
     data_dir: Path = Path.home() / ".local" / "share" / "nix-search"
-    half_page: int = 15
-    max_description_length: int = 60
-    required_commands: list[str] = ["nix", "git"]
-    channel: str = "nixpkgs"
-    max_channels: int = 5
 
-    @field_validator("half_page", "max_description_length")
-    @classmethod
-    def _must_be_positive(cls, v: int) -> int:
-        if v < 1:
-            msg = "must be a positive integer"
-            raise ValueError(msg)
-        return v
+    # Fixed Settings
+    half_page: int = Field(15, ge=10, le=20, init=False, frozen=True)
+    log_format: str = Field(
+        "%(asctime)s %(levelname)s %(name)s: %(message)s", init=False, frozen=True
+    )
+    log_date_format: str = Field("%Y-%m-%d %H:%M:%S", init=False, frozen=True)
+    max_description_length: int = Field(60, init=False, frozen=True)
+    required_commands: list[str] = Field(
+        default_factory=lambda: ["nix", "git"], init=False, frozen=True
+    )
+    channel: str = Field("nixpkgs", init=False, frozen=True)
+    max_channels: int = Field(5, ge=1, le=5, init=False, frozen=True)
 
     @property
     def log_file(self) -> Path:
