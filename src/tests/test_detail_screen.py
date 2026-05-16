@@ -1,53 +1,45 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from nixsearch.app import NixSearchApp
 from nixsearch.detail_screen import DetailScreen
-from nixsearch.exceptions import NixSearchFailedError
-from nixsearch.service import (
-    NixLicense,
-    NixMaintainer,
-    NixPackage,
-    NixPackageMetadata,
-    NixSearchService,
-)
-
-SAMPLE_META = NixPackageMetadata(
-    description="A greeting program",
-    homepage="https://example.com",
-    position="/nix/store/abc-source/pkgs/hello/default.nix:1",
-    broken=False,
-    unfree=False,
-    insecure=False,
-    available=True,
-    long_description="A longer description\nwith multiple lines.",
-    changelog="https://example.com/changelog",
-    license=[
-        NixLicense(
-            full_name="MIT",
-            spdx_id="MIT",
-            url="https://opensource.org/licenses/MIT",
-            free=True,
-        )
-    ],
-    maintainers=[NixMaintainer(name="Alice", email="alice@example.com", github="alice")],
-    main_program="hello",
-    platforms=["x86_64-linux"],
-)
+from nixsearch.service import NixPackage, NixPackageMetadata, NixSearchService
 
 SAMPLE_PKG = NixPackage(
     name="hello", nixpkgs_attr="hello", version="2.12", description="A greeting"
 )
 
+SAMPLE_META_DICT = {
+    "description": "A greeting program",
+    "homepage": "https://example.com",
+    "position": "/nix/store/abc-source/pkgs/hello/default.nix:1",
+    "broken": False,
+    "unfree": False,
+    "insecure": False,
+    "available": True,
+    "longDescription": "A longer description\nwith multiple lines.",
+    "changelog": "https://example.com/changelog",
+    "license": [
+        {
+            "fullName": "MIT",
+            "spdxId": "MIT",
+            "url": "https://opensource.org/licenses/MIT",
+            "free": True,
+        }
+    ],
+    "maintainers": [{"name": "Alice", "email": "alice@example.com", "github": "alice"}],
+    "mainProgram": "hello",
+    "platforms": ["x86_64-linux"],
+}
+
 
 @pytest.mark.asyncio
-async def test_detail_screen_mounts():
+async def test_detail_screen_mounts(mock_package_index):
+    mock_package_index.get_meta.return_value = SAMPLE_META_DICT
     app = NixSearchApp()
     async with app.run_test() as pilot:
         screen = DetailScreen(SAMPLE_PKG)
-        screen._service = AsyncMock()
-        screen._service.get_meta = AsyncMock(return_value=SAMPLE_META)
         app.push_screen(screen)
         await pilot.pause()
         content = screen.query_one("#detail-content")
@@ -55,12 +47,11 @@ async def test_detail_screen_mounts():
 
 
 @pytest.mark.asyncio
-async def test_detail_screen_shows_metadata():
+async def test_detail_screen_shows_metadata(mock_package_index):
+    mock_package_index.get_meta.return_value = SAMPLE_META_DICT
     app = NixSearchApp()
     async with app.run_test() as pilot:
         screen = DetailScreen(SAMPLE_PKG)
-        screen._service = AsyncMock()
-        screen._service.get_meta = AsyncMock(return_value=SAMPLE_META)
         app.push_screen(screen)
         await pilot.pause()
         text = str(screen.query_one("#detail-content").render())
@@ -70,25 +61,39 @@ async def test_detail_screen_shows_metadata():
 
 
 @pytest.mark.asyncio
-async def test_detail_screen_handles_error():
+async def test_detail_screen_handles_missing_cache(mock_package_index):
+    mock_package_index.get_meta.return_value = None
     app = NixSearchApp()
     async with app.run_test() as pilot:
         screen = DetailScreen(SAMPLE_PKG)
-        screen._service = AsyncMock()
-        screen._service.get_meta = AsyncMock(side_effect=NixSearchFailedError("nix failed"))
         app.push_screen(screen)
         await pilot.pause()
         text = str(screen.query_one("#detail-content").render())
-        assert "Failed" in text
+        assert "No metadata cached" in text
 
 
 @pytest.mark.asyncio
-async def test_detail_screen_go_back():
+async def test_detail_screen_handles_invalid_meta(mock_package_index):
+    # description must be a string; passing a list triggers ValidationError
+    mock_package_index.get_meta.return_value = {"description": [1, 2, 3]}
     app = NixSearchApp()
     async with app.run_test() as pilot:
         screen = DetailScreen(SAMPLE_PKG)
-        screen._service = AsyncMock()
-        screen._service.get_meta = AsyncMock(return_value=SAMPLE_META)
+        app.push_screen(screen)
+        await pilot.pause()
+        # Call the loader directly so we can deterministically inspect the result
+        await screen._load_meta()
+        text = str(screen.query_one("#detail-content").render())
+        assert "Failed to parse" in text
+        assert screen._meta is None
+
+
+@pytest.mark.asyncio
+async def test_detail_screen_go_back(mock_package_index):
+    mock_package_index.get_meta.return_value = SAMPLE_META_DICT
+    app = NixSearchApp()
+    async with app.run_test() as pilot:
+        screen = DetailScreen(SAMPLE_PKG)
         app.push_screen(screen)
         await pilot.pause()
         assert isinstance(app.screen, DetailScreen)
@@ -98,25 +103,22 @@ async def test_detail_screen_go_back():
 
 
 @pytest.mark.asyncio
-async def test_detail_screen_copy_attr():
+async def test_detail_screen_copy_attr(mock_package_index):
+    mock_package_index.get_meta.return_value = SAMPLE_META_DICT
     app = NixSearchApp()
     async with app.run_test() as pilot:
         screen = DetailScreen(SAMPLE_PKG)
-        screen._service = AsyncMock()
-        screen._service.get_meta = AsyncMock(return_value=SAMPLE_META)
         app.push_screen(screen)
         await pilot.pause()
-        # Should not raise
         screen.action_copy_attr()
 
 
 @pytest.mark.asyncio
-async def test_detail_screen_copy_attr_clipboard_failure():
+async def test_detail_screen_copy_attr_clipboard_failure(mock_package_index):
+    mock_package_index.get_meta.return_value = SAMPLE_META_DICT
     app = NixSearchApp()
     async with app.run_test() as pilot:
         screen = DetailScreen(SAMPLE_PKG)
-        screen._service = AsyncMock()
-        screen._service.get_meta = AsyncMock(return_value=SAMPLE_META)
         app.push_screen(screen)
         await pilot.pause()
         with patch.object(app, "copy_to_clipboard", side_effect=OSError("no clipboard")):
@@ -124,21 +126,19 @@ async def test_detail_screen_copy_attr_clipboard_failure():
 
 
 @pytest.mark.asyncio
-async def test_detail_screen_format_flags():
-    meta = NixPackageMetadata(
-        description="A broken package",
-        homepage="",
-        position="",
-        broken=True,
-        unfree=True,
-        insecure=True,
-        available=False,
-    )
+async def test_detail_screen_format_flags(mock_package_index):
+    mock_package_index.get_meta.return_value = {
+        "description": "A broken package",
+        "homepage": "",
+        "position": "",
+        "broken": True,
+        "unfree": True,
+        "insecure": True,
+        "available": False,
+    }
     app = NixSearchApp()
     async with app.run_test() as pilot:
         screen = DetailScreen(SAMPLE_PKG)
-        screen._service = AsyncMock()
-        screen._service.get_meta = AsyncMock(return_value=meta)
         app.push_screen(screen)
         await pilot.pause()
         text = str(screen.query_one("#detail-content").render())
@@ -171,47 +171,41 @@ def test_copy_nix_source_missing_dir():
 
 
 @pytest.mark.asyncio
-async def test_edit_source_no_meta():
+async def test_edit_source_no_meta(mock_package_index):
+    mock_package_index.get_meta.return_value = SAMPLE_META_DICT
     app = NixSearchApp()
     async with app.run_test() as pilot:
         screen = DetailScreen(SAMPLE_PKG)
-        screen._service = AsyncMock()
-        screen._service.get_meta = AsyncMock(return_value=SAMPLE_META)
         app.push_screen(screen)
         await pilot.pause()
-        # Clear _meta to simulate missing metadata
         screen._meta = None
         screen.action_edit_source()
 
 
 @pytest.mark.asyncio
-async def test_edit_source_no_position():
-    meta_no_pos = NixPackageMetadata(description="test", position=None)
+async def test_edit_source_no_position(mock_package_index):
+    mock_package_index.get_meta.return_value = {"description": "test", "position": None}
     app = NixSearchApp()
     async with app.run_test() as pilot:
         screen = DetailScreen(SAMPLE_PKG)
-        screen._service = AsyncMock()
-        screen._service.get_meta = AsyncMock(return_value=meta_no_pos)
         app.push_screen(screen)
         await pilot.pause()
         screen.action_edit_source()
 
 
 @pytest.mark.asyncio
-async def test_edit_source_opens_editor(tmp_path):
+async def test_edit_source_opens_editor(tmp_path, mock_package_index):
     source_dir = tmp_path / "pkgs" / "hello"
     source_dir.mkdir(parents=True)
     (source_dir / "default.nix").write_text("{ stdenv }: stdenv.mkDerivation {}")
 
-    meta = NixPackageMetadata(
-        description="test",
-        position=f"{source_dir}/default.nix:1",
-    )
+    mock_package_index.get_meta.return_value = {
+        "description": "test",
+        "position": f"{source_dir}/default.nix:1",
+    }
     app = NixSearchApp()
     async with app.run_test() as pilot:
         screen = DetailScreen(SAMPLE_PKG)
-        screen._service = AsyncMock()
-        screen._service.get_meta = AsyncMock(return_value=meta)
         app.push_screen(screen)
         await pilot.pause()
         with (
@@ -225,16 +219,22 @@ async def test_edit_source_opens_editor(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_edit_source_source_not_found():
-    meta = NixPackageMetadata(
-        description="test",
-        position="/nonexistent/path/default.nix:1",
-    )
+async def test_edit_source_source_not_found(mock_package_index):
+    mock_package_index.get_meta.return_value = {
+        "description": "test",
+        "position": "/nonexistent/path/default.nix:1",
+    }
     app = NixSearchApp()
     async with app.run_test() as pilot:
         screen = DetailScreen(SAMPLE_PKG)
-        screen._service = AsyncMock()
-        screen._service.get_meta = AsyncMock(return_value=meta)
         app.push_screen(screen)
         await pilot.pause()
         screen.action_edit_source()
+
+
+def test_sample_meta_dict_parses():
+    # Sanity check that the dict literal we use in tests round-trips into the model.
+    meta = NixPackageMetadata(**SAMPLE_META_DICT)
+    assert meta.description == "A greeting program"
+    assert meta.license[0].full_name == "MIT"
+    assert meta.long_description.startswith("A longer description")

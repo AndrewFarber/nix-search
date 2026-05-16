@@ -25,3 +25,7 @@ class MissingDependencyError(Error):
 
 class UnknownThemeError(Error):
     default_message: str = "The requested theme does not exist."
+
+
+class IndexRefreshError(Error):
+    default_message: str = "Refreshing the package index failed."

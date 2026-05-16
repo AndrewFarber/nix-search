@@ -66,6 +66,7 @@
               ps.ruff
             ]))
             pkgs.just
+            pkgs.brotli
           ];
         };
       }

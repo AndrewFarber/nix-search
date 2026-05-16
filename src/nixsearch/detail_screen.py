@@ -1,5 +1,7 @@
 import subprocess
 
+from pydantic import ValidationError
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import VerticalScroll
@@ -7,7 +9,7 @@ from textual.screen import Screen
 from textual.widgets import Footer, Header, Static
 
 from nixsearch.config import config
-from nixsearch.exceptions import NixNotFoundError, NixSearchFailedError
+from nixsearch.db import PackageIndex
 from nixsearch.log import get_logger
 from nixsearch.service import NixPackage, NixPackageMetadata, NixSearchService
 
@@ -22,11 +24,11 @@ class DetailScreen(Screen):
         Binding("e", "edit_source", "Edit source"),
     ]
 
-    def __init__(self, package: NixPackage, channel: str = "nixpkgs") -> None:
+    def __init__(self, package: NixPackage, channel: str = "nixos-unstable") -> None:
         super().__init__()
         self._package = package
         self._channel = channel
-        self._service: NixSearchService | None = None
+        self._index: PackageIndex | None = None
         self._meta: NixPackageMetadata | None = None
 
     def compose(self) -> ComposeResult:
@@ -41,13 +43,20 @@ class DetailScreen(Screen):
 
     async def _load_meta(self) -> None:
         content = self.query_one("#detail-content", Static)
-        if self._service is None:
-            self._service = NixSearchService()
+        if self._index is None:
+            self._index = PackageIndex()
+        index = self._index
+        raw = index.get_meta(self._package.nixpkgs_attr, channel=self._channel)
+        if raw is None:
+            content.update(
+                f"No metadata cached for {self._package.nixpkgs_attr} in {self._channel}"
+            )
+            return
         try:
-            meta = await self._service.get_meta(self._package.nixpkgs_attr, channel=self._channel)
-        except (NixNotFoundError, NixSearchFailedError) as e:
-            log.error("Failed to fetch metadata for %r: %s", self._package.nixpkgs_attr, e)
-            content.update(f"Failed to load metadata: {e}")
+            meta = NixPackageMetadata(**raw)
+        except ValidationError as e:
+            log.error("Invalid cached metadata for %s: %s", self._package.nixpkgs_attr, e)
+            content.update(Text(f"Failed to parse cached metadata: {e}"))
             return
         self._meta = meta
         content.update(self._format_meta(meta))

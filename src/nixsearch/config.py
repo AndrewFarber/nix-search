@@ -20,10 +20,11 @@ class Config(BaseSettings):
     log_date_format: str = Field("%Y-%m-%d %H:%M:%S", init=False, frozen=True)
     max_description_length: int = Field(60, init=False, frozen=True)
     required_commands: list[str] = Field(
-        default_factory=lambda: ["nix", "git"], init=False, frozen=True
+        default_factory=lambda: ["nix", "git", "brotli"], init=False, frozen=True
     )
-    channel: str = Field("nixpkgs", init=False, frozen=True)
+    channel: str = Field("nixos-unstable", init=False, frozen=True)
     max_channels: int = Field(5, ge=1, le=5, init=False, frozen=True)
+    cache_ttl_days: int = Field(7, ge=1, init=False, frozen=True)
 
     @property
     def log_file(self) -> Path:

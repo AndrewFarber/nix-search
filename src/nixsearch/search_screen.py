@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal
@@ -5,8 +7,9 @@ from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Header, Input, Select
 
 from nixsearch.config import config
+from nixsearch.db import PackageIndex
 from nixsearch.detail_screen import DetailScreen
-from nixsearch.exceptions import NixNotFoundError, NixSearchFailedError
+from nixsearch.exceptions import IndexRefreshError, NixSearchFailedError
 from nixsearch.log import get_logger
 from nixsearch.service import NixPackage, NixSearchService
 
@@ -27,6 +30,7 @@ class SearchScreen(Screen):
         Binding("y", "copy_attr", "Copy attr", priority=True),
         Binding("slash", "focus_input", "New Search"),
         Binding("c", "focus_channel", "Channel", priority=True),
+        Binding("r", "refresh_cache", "Refresh", priority=True),
         Binding("q", "quit", "Quit", show=False, priority=True),
     ]
 
@@ -35,7 +39,7 @@ class SearchScreen(Screen):
         with Horizontal(id="search-bar"):
             yield Input(placeholder="Search nixpkgs (Enter to search)...", id="search-input")
             yield Select(
-                [(f"{config.channel} (unstable)", config.channel)],
+                [(config.channel, config.channel)],
                 value=config.channel,
                 id="channel-select",
                 allow_blank=False,
@@ -45,6 +49,7 @@ class SearchScreen(Screen):
 
     def on_mount(self) -> None:
         self._service = NixSearchService()
+        self._index = PackageIndex()
         self._results: list[NixPackage] = []
         self._table = self.query_one("#search-results", DataTable)
         self._input = self.query_one("#search-input", Input)
@@ -54,7 +59,14 @@ class SearchScreen(Screen):
         self._table.add_column("Version", width=15)
         self._table.add_column("Description")
         self._input.focus()
+        self._update_subtitle()
         self.run_worker(self._load_channels(), exclusive=False, exit_on_error=False)
+        if self._index.is_stale(self._selected_channel, config.cache_ttl_days):
+            self.run_worker(
+                self._refresh_worker(self._selected_channel),
+                exclusive=False,
+                exit_on_error=False,
+            )
 
     def _input_has_focus(self) -> bool:
         return self._input.has_focus
@@ -69,6 +81,14 @@ class SearchScreen(Screen):
             return config.channel
         return str(value)
 
+    def _update_subtitle(self) -> None:
+        info = self._index.info(self._selected_channel)
+        if info is None:
+            self.sub_title = f"Cache: empty ({self._selected_channel})"
+        else:
+            ts = datetime.fromtimestamp(info.fetched_at).strftime("%Y-%m-%d %H:%M")
+            self.sub_title = f"Cache: {ts} · {info.pkg_count} pkgs ({self._selected_channel})"
+
     async def _load_channels(self) -> None:
         try:
             channels_list = await self._service.list_channels()
@@ -76,9 +96,10 @@ class SearchScreen(Screen):
             log.warning("Failed to load channels: %s", e)
             return
         default = config.channel
-        options: list[tuple[str, str]] = [(f"{default} (unstable)", default)]
+        options: list[tuple[str, str]] = [(default, default)]
         for ch in channels_list[: config.max_channels]:
-            options.append((ch.branch, ch.flake_ref))
+            if ch.branch != default:
+                options.append((ch.branch, ch.branch))
         self._channel_select.set_options(options)
         self._channel_select.value = default
 
@@ -91,17 +112,17 @@ class SearchScreen(Screen):
                 exit_on_error=False,
             )
 
-    async def _search_worker(self, query: str, channel: str = "nixpkgs") -> None:
+    async def _search_worker(self, query: str, channel: str) -> None:
         self._table.clear()
         self._results = []
-        if channel == config.channel:
-            label = f"{config.channel} (unstable)"
-        else:
-            label = channel.split("/")[-1]
-        self.notify(f"Searching {label}", timeout=5)
+        info = self._index.info(channel)
+        if info is None:
+            self.notify(f"No cache for {channel} — press 'r' to refresh", severity="warning")
+            return
+        self.notify(f"Searching {channel}", timeout=3)
         try:
-            results = await self._service.search(query, channel=channel)
-        except (NixNotFoundError, NixSearchFailedError) as e:
+            results = self._index.search(query, channel=channel)
+        except Exception as e:  # noqa: BLE001 -- sqlite errors are varied
             log.error("Search failed for %r: %s", query, e)
             self.notify(f"Search failed: {e}", severity="error")
             return
@@ -119,6 +140,19 @@ class SearchScreen(Screen):
             self._table.add_row(pkg.nixpkgs_attr, pkg.version or "unknown", desc)
         self._table.focus()
 
+    async def _refresh_worker(self, channel: str) -> None:
+        self.notify(f"Refreshing cache for {channel}...", timeout=10)
+        try:
+            info = await self._index.refresh(channel)
+        except IndexRefreshError as e:
+            log.error("Refresh failed for %s: %s", channel, e)
+            self.notify(f"Refresh failed: {e}", severity="error")
+            return
+        finally:
+            self.app.clear_notifications()
+        self.notify(f"Cached {info.pkg_count} packages from {channel}", timeout=3)
+        self._update_subtitle()
+
     def _cycle_channel(self, delta: int) -> None:
         options = self._channel_select._options
         if not options:
@@ -131,6 +165,10 @@ class SearchScreen(Screen):
             idx = 0
         idx = (idx + delta) % len(values)
         self._channel_select.value = values[idx]
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        if event.control is self._channel_select:
+            self._update_subtitle()
 
     def action_cursor_down(self) -> None:
         if self._input_has_focus():
@@ -212,6 +250,15 @@ class SearchScreen(Screen):
     def action_focus_table(self) -> None:
         if (self._input_has_focus() or self._channel_has_focus()) and self._table.row_count > 0:
             self._table.focus()
+
+    def action_refresh_cache(self) -> None:
+        if self._input_has_focus():
+            return
+        self.run_worker(
+            self._refresh_worker(self._selected_channel),
+            exclusive=False,
+            exit_on_error=False,
+        )
 
     def action_quit(self) -> None:
         if not self._input_has_focus():
